@@ -1,0 +1,152 @@
+<!--
+Copyright (C) 2024 The Qt Company Ltd.
+SPDX-License-Identifier: LicenseRef-Qt-Commercial OR GPL-3.0-only
+-->
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, user-scalable=0"/>
+    <title>CRYPTO TERMINAL</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; overflow: hidden; background: #080c18; }
+      #screen { width: 100%; height: 100%; }
+
+      #qtspinner {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: monospace;
+        color: #00ff41;
+        background: #080c18;
+        z-index: 100;
+      }
+
+      .spinner-box {
+        border: 1px solid #1e3a5f;
+        padding: 40px 56px;
+        text-align: center;
+        position: relative;
+        min-width: 340px;
+      }
+
+      .spinner-box::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 2px;
+        background: #3b82f6;
+      }
+
+      .spinner-title {
+        color: #e2e8f0;
+        font-size: 15px;
+        font-weight: bold;
+        letter-spacing: 3px;
+        margin-bottom: 28px;
+      }
+
+      .spinner-bar-wrap {
+        width: 240px;
+        height: 6px;
+        background: #0f1929;
+        border: 1px solid #1e2d50;
+        border-radius: 3px;
+        margin: 0 auto 16px;
+        overflow: hidden;
+      }
+
+      .spinner-bar {
+        height: 100%;
+        width: 0%;
+        border-radius: 3px;
+        background: #3b82f6;
+        animation: progress 2.4s ease-in-out infinite;
+      }
+
+      @keyframes progress {
+        0%   { width: 0%;   margin-left: 0; }
+        50%  { width: 60%;  margin-left: 20%; }
+        100% { width: 0%;   margin-left: 100%; }
+      }
+
+      #qtstatus {
+        color: #475569;
+        font-size: 11px;
+        letter-spacing: 1px;
+        margin-top: 4px;
+        min-height: 18px;
+      }
+
+      .grid-bg {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.03;
+        background-image:
+          linear-gradient(#4488ff 1px, transparent 1px),
+          linear-gradient(90deg, #4488ff 1px, transparent 1px);
+        background-size: 40px 40px;
+      }
+    </style>
+  </head>
+  <body onload="init()">
+    <div class="grid-bg"></div>
+
+    <figure id="qtspinner">
+      <div class="spinner-box">
+        <div class="spinner-title">CRYPTO TERMINAL</div>
+        <div class="spinner-bar-wrap">
+          <div class="spinner-bar"></div>
+        </div>
+        <div id="qtstatus">INITIALIZING...</div>
+        <noscript>JavaScript is disabled. Please enable JavaScript to use this application.</noscript>
+      </div>
+    </figure>
+
+    <div id="screen"></div>
+
+    <script type="text/javascript">
+        async function init() {
+            const spinner = document.querySelector('#qtspinner');
+            const screen  = document.querySelector('#screen');
+            const status  = document.querySelector('#qtstatus');
+
+            const showSpinner = () => spinner.style.display = 'flex';
+            const hideSpinner = () => spinner.style.display = 'none';
+
+            try {
+                showSpinner();
+                status.innerHTML = 'LOADING MODULE...';
+
+                const instance = await qtLoad({
+                    qt: {
+                        onLoaded: () => hideSpinner(),
+                        onExit: exitData => {
+                            status.innerHTML = 'APPLICATION EXIT';
+                            if (exitData.code !== undefined)
+                                status.innerHTML += ` &mdash; CODE ${exitData.code}`;
+                            if (exitData.text !== undefined)
+                                status.innerHTML += ` (${exitData.text})`;
+                            showSpinner();
+                        },
+                        entryFunction: window.appwebassembly_entry,
+                        containerElements: [screen],
+                    }
+                });
+            } catch (e) {
+                status.innerHTML = 'ERROR: ' + e.message;
+                showSpinner();
+                console.error(e);
+            }
+        }
+    </script>
+    <script type="text/javascript" src="qtloader.js"></script>
+    <script src="appwebassembly.js"></script>
+  </body>
+</html>
