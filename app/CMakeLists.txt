@@ -57,12 +57,13 @@ if(EMSCRIPTEN)
             "${CMAKE_CURRENT_BINARY_DIR}/qtloader.js"
             "${CMAKE_CURRENT_BINARY_DIR}/qtlogo.svg"
             "${CMAKE_SOURCE_DIR}/server/serve.py"
+            "${CMAKE_SOURCE_DIR}/_headers"
             "${DEPLOY_SRC}"
         COMMAND ${CMAKE_COMMAND} -E chdir "${DEPLOY_SRC}"
             ${CMAKE_COMMAND} -E tar "czf"
             "${DEPLOY_DIR}/appwebassembly.tar.gz"
             --format=gnutar
-            -- "index.html" "appwebassembly.js" "appwebassembly.wasm" "qtloader.js" "qtlogo.svg" "serve.py"
+            -- "index.html" "appwebassembly.js" "appwebassembly.wasm" "qtloader.js" "qtlogo.svg" "serve.py" "_headers"
         COMMENT "Creating deploy package in ${DEPLOY_DIR}"
     )
 

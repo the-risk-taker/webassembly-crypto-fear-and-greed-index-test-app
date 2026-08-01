@@ -1,5 +1,14 @@
 # Deployment
 
+- [Build the deploy package](#build-the-deploy-package)
+- [Copy to server](#copy-to-server)
+- [Extract and start on server](#extract-and-start-on-server)
+- [Accessing from a browser over LAN (HTTP)](#accessing-from-a-browser-over-lan-http)
+- [Notes](#notes)
+- [Deploying to Netlify](#deploying-to-netlify)
+- [Deploying to Cloudflare Pages](#deploying-to-cloudflare-pages)
+  - [Cloudflare setup](#cloudflare-setup)
+
 ## Build the deploy package
 
 On the build machine, run the `deploy` cmake target:
@@ -58,3 +67,29 @@ Multithreaded WASM requires `Cross-Origin-Opener-Policy` and `Cross-Origin-Embed
 ```
 
 The `index.html` entry point is served automatically by Netlify.
+
+## Deploying to Cloudflare Pages
+
+Requires a domain/subdomain on a Cloudflare-managed zone (root domain can be hosted elsewhere - only the zone's nameservers need to point at Cloudflare).
+
+Multithreaded WASM requires `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` headers. A `_headers` file at the repo root provides these and is bundled into the deploy package by the `deploy` cmake target:
+
+```text
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+```
+
+Deploy the built sources with wrangler:
+
+```shell
+wrangler pages deploy build-wasm/deploy/sources --project-name=crypto-terminal
+```
+
+First run creates the Pages project and prints a `*.pages.dev` URL - verify it loads (check `crossOriginIsolated` in devtools) before attaching a custom domain.
+
+### Cloudflare setup
+
+1. Add the domain as a zone in the Cloudflare dashboard (skip if already there) and point its nameservers at Cloudflare.
+2. Dashboard -> Workers & Pages -> the project -> **Custom domains** -> add the desired subdomain (e.g. `app.example.com`). Cloudflare creates the CNAME and issues the certificate automatically.
+3. Verify: `curl -I https://<subdomain>` and confirm `cross-origin-opener-policy` / `cross-origin-embedder-policy` headers are present.
