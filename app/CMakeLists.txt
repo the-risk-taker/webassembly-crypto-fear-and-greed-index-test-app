@@ -4,6 +4,10 @@ qt_standard_project_setup(REQUIRES 6.8)
 
 qt_add_executable(appwebassembly
     main.cpp
+    SessionStore.cpp
+    SessionStore.h
+    FngController.cpp
+    FngController.h
 )
 
 qt_add_qml_module(appwebassembly
@@ -56,6 +60,7 @@ if(EMSCRIPTEN)
             "${CMAKE_CURRENT_BINARY_DIR}/appwebassembly.wasm"
             "${CMAKE_CURRENT_BINARY_DIR}/qtloader.js"
             "${CMAKE_CURRENT_BINARY_DIR}/qtlogo.svg"
+            "${CMAKE_CURRENT_SOURCE_DIR}/favicon.svg"
             "${CMAKE_SOURCE_DIR}/server/serve.py"
             "${CMAKE_SOURCE_DIR}/_headers"
             "${DEPLOY_SRC}"
@@ -63,7 +68,7 @@ if(EMSCRIPTEN)
             ${CMAKE_COMMAND} -E tar "czf"
             "${DEPLOY_DIR}/appwebassembly.tar.gz"
             --format=gnutar
-            -- "index.html" "appwebassembly.js" "appwebassembly.wasm" "qtloader.js" "qtlogo.svg" "serve.py" "_headers"
+            -- "index.html" "appwebassembly.js" "appwebassembly.wasm" "qtloader.js" "qtlogo.svg" "favicon.svg" "serve.py" "_headers"
         COMMENT "Creating deploy package in ${DEPLOY_DIR}"
     )
 

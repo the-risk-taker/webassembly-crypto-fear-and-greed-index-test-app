@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import webassembly
 
 Window {
     id: root
@@ -10,14 +11,14 @@ Window {
     title: "CRYPTO FEAR & GREED"
     color: "#080c18"
 
-    readonly property string fngApiUrl: "https://api.alternative.me/fng/?limit=1"
-
     property string appState: "login"
-    property int fngValue: -1
-    property string fngClassification: ""
-    property string fngTimestamp: ""
     property string errorMsg: ""
-    property bool fetching: false
+    property bool isMobile: width < 700
+    readonly property int sessionDurationMs: 15 * 60 * 1000
+
+    FngController {
+        id: fng
+    }
 
     // WARNING: credentials are checked client-side and visible in the binary - this is UI-only gatekeeping, not real auth
     readonly property string validUser: "admin"
@@ -51,11 +52,11 @@ Window {
             }
 
             Text {
-                text: "CRYPTO FEAR & GREED INDEX"
+                text: isMobile ? "F&G INDEX" : "CRYPTO FEAR & GREED INDEX"
                 color: "#e2e8f0"
-                font.pixelSize: 13
+                font.pixelSize: isMobile ? 12 : 13
                 font.bold: true
-                font.letterSpacing: 2
+                font.letterSpacing: isMobile ? 1 : 2
                 anchors.verticalCenter: parent.verticalCenter
             }
         }
@@ -116,12 +117,7 @@ Window {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        appState = "login"
-                        fngValue = -1; fngClassification = ""; fngTimestamp = ""
-                        errorMsg = ""
-                        userField.text = ""; passField.text = ""
-                    }
+                    onClicked: logout()
                 }
             }
         }
@@ -134,7 +130,7 @@ Window {
 
         Rectangle {
             anchors.centerIn: parent
-            width: 380
+            width: Math.min(380, root.width - 32)
             height: 300
             color: "#0d1224"
             border.color: "#1e3a5f"
@@ -150,7 +146,7 @@ Window {
             }
 
             Column {
-                anchors { fill: parent; margins: 28 }
+                anchors { fill: parent; margins: isMobile ? 20 : 28 }
                 spacing: 0
 
                 Text {
@@ -289,297 +285,304 @@ Window {
         }
 
         // Main content
-        Item {
-            anchors { fill: parent; margins: 24 }
+        Flickable {
+            anchors { fill: parent; margins: isMobile ? 16 : 24 }
+            contentWidth: width
+            contentHeight: cardsFlow.height + 16 + actionBar.height
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
 
-            // ── INDEX CARD ────────────────────────────────────────────────────
-            Rectangle {
-                id: indexCard
-                anchors { top: parent.top; left: parent.left }
-                width: 320
-                height: 260
-                color: "#0d1224"
-                border.color: "#1e3a5f"
-                border.width: 1
-                radius: 4
+            Flow {
+                id: cardsFlow
+                width: parent.width
+                spacing: 16
 
+                // ── INDEX CARD ───────────────────────────────────────────────
                 Rectangle {
-                    anchors { top: parent.top; left: parent.left; right: parent.right }
-                    height: 2
-                    color: fngValue >= 0 ? indexColor(fngValue) : "#3b82f6"
-                    radius: 2
-                    Behavior on color { ColorAnimation { duration: 800 } }
-                }
+                    id: indexCard
+                    width: isMobile ? parent.width : 320
+                    height: 260
+                    color: "#0d1224"
+                    border.color: "#1e3a5f"
+                    border.width: 1
+                    radius: 4
 
-                Column {
-                    anchors { fill: parent; margins: 20 }
-                    spacing: 0
-
-                    Row {
-                        width: parent.width
-                        spacing: 8
-
-                        Text {
-                            text: "FEAR & GREED INDEX"
-                            color: "#64748b"
-                            font.pixelSize: 10
-                            font.letterSpacing: 1.5
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-
-                    }
-
-                    Item { width: 1; height: 16 }
-
-                    // Big number
-                    Item {
-                        width: parent.width
-                        height: 90
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: fngValue >= 0 ? fngValue : "--"
-                            color: fngValue >= 0 ? indexColor(fngValue) : "#1e3a5f"
-                            font.pixelSize: 80
-                            font.bold: true
-
-                            Behavior on color { ColorAnimation { duration: 800 } }
-                        }
-
-                        // Spinner
-                        Text {
-                            anchors.centerIn: parent
-                            visible: fetching
-                            text: "..."
-                            color: "#3b82f6"
-                            font.pixelSize: 40
-                            font.bold: true
-
-                            SequentialAnimation on opacity {
-                                loops: Animation.Infinite
-                                running: fetching
-                                NumberAnimation { to: 0.2; duration: 400 }
-                                NumberAnimation { to: 1.0; duration: 400 }
-                            }
-                        }
-                    }
-
-                    // Classification badge
                     Rectangle {
-                        width: classLabel.implicitWidth + 20
-                        height: 24
-                        radius: 12
-                        color: fngValue >= 0 ? Qt.rgba(
-                            Qt.color(indexColor(fngValue)).r,
-                            Qt.color(indexColor(fngValue)).g,
-                            Qt.color(indexColor(fngValue)).b, 0.15) : "#111827"
-                        border.color: fngValue >= 0 ? indexColor(fngValue) : "#1e3a5f"
-                        border.width: 1
-                        visible: fngClassification !== ""
-
-                        Text {
-                            id: classLabel
-                            anchors.centerIn: parent
-                            text: fngClassification.toUpperCase()
-                            color: fngValue >= 0 ? indexColor(fngValue) : "#64748b"
-                            font.pixelSize: 10
-                            font.bold: true
-                            font.letterSpacing: 1
-                        }
+                        anchors { top: parent.top; left: parent.left; right: parent.right }
+                        height: 2
+                        color: fng.value >= 0 ? fng.indexColor(fng.value) : "#3b82f6"
+                        radius: 2
+                        Behavior on color { ColorAnimation { duration: 800 } }
                     }
 
-                    Item { width: 1; height: 14 }
-
-                    // Gauge bar
                     Column {
-                        width: parent.width
-                        spacing: 4
-                        visible: fngValue >= 0
-
-                        Rectangle {
-                            width: parent.width
-                            height: 6
-                            radius: 3
-                            color: "#0f1929"
-                            border.color: "#1e2d50"
-                            border.width: 1
-
-                            Rectangle {
-                                width: parent.width * (fngValue / 100)
-                                height: parent.height
-                                radius: 3
-                                color: indexColor(fngValue)
-                                Behavior on width { NumberAnimation { duration: 1000; easing.type: Easing.OutCubic } }
-                                Behavior on color { ColorAnimation { duration: 800 } }
-                            }
-                        }
+                        anchors { fill: parent; margins: 20 }
+                        spacing: 0
 
                         Row {
                             width: parent.width
+                            spacing: 8
 
                             Text {
-                                text: "0  FEAR"
-                                color: "#ef4444"
-                                font.pixelSize: 9
-                                font.letterSpacing: 0.5
-                                width: parent.width / 2
-                            }
-
-                            Text {
-                                text: "GREED  100"
-                                color: "#22c55e"
-                                font.pixelSize: 9
-                                font.letterSpacing: 0.5
-                                width: parent.width / 2
-                                horizontalAlignment: Text.AlignRight
+                                text: "FEAR & GREED INDEX"
+                                color: "#64748b"
+                                font.pixelSize: 10
+                                font.letterSpacing: 1.5
+                                anchors.verticalCenter: parent.verticalCenter
                             }
                         }
-                    }
-                }
-            }
 
-            // ── METADATA CARD ─────────────────────────────────────────────────
-            Rectangle {
-                anchors { top: parent.top; left: indexCard.right; leftMargin: 16 }
-                width: 280
-                height: 260
-                color: "#0d1224"
-                border.color: "#1e3a5f"
-                border.width: 1
-                radius: 4
+                        Item { width: 1; height: 16 }
 
-                Rectangle {
-                    anchors { top: parent.top; left: parent.left; right: parent.right }
-                    height: 2
-                    color: "#1e40af"
-                    radius: 2
-                }
-
-                Column {
-                    anchors { fill: parent; margins: 20 }
-                    spacing: 0
-
-                    Text {
-                        text: "SIGNAL METADATA"
-                        color: "#64748b"
-                        font.pixelSize: 10
-                        font.letterSpacing: 1.5
-                        bottomPadding: 20
-                    }
-
-                    Repeater {
-                        model: [
-                            { label: "SOURCE",     value: "alternative.me" },
-                            { label: "ENDPOINT",   value: "/fng/?limit=1" },
-                            { label: "UPDATED",    value: fngTimestamp !== "" ? fngTimestamp.substring(0, 16) : "--" },
-                            { label: "RANGE",      value: "0 (Fear) – 100 (Greed)" },
-                            { label: "STATUS",     value: fetching ? "FETCHING..." : (fngValue >= 0 ? "OK" : (errorMsg !== "" ? "ERROR" : "--")) }
-                        ]
-
-                        delegate: Column {
+                        // Big number
+                        Item {
                             width: parent.width
-                            spacing: 2
-                            bottomPadding: 14
+                            height: 90
 
                             Text {
-                                text: modelData.label
-                                color: "#334155"
-                                font.pixelSize: 9
+                                anchors.centerIn: parent
+                                text: fng.value >= 0 ? fng.value : "--"
+                                color: fng.value >= 0 ? fng.indexColor(fng.value) : "#1e3a5f"
+                                font.pixelSize: 80
+                                font.bold: true
+
+                                Behavior on color { ColorAnimation { duration: 800 } }
+                            }
+
+                            // Spinner
+                            Text {
+                                anchors.centerIn: parent
+                                visible: fng.fetching
+                                text: "..."
+                                color: "#3b82f6"
+                                font.pixelSize: 40
+                                font.bold: true
+
+                                SequentialAnimation on opacity {
+                                    loops: Animation.Infinite
+                                    running: fng.fetching
+                                    NumberAnimation { to: 0.2; duration: 400 }
+                                    NumberAnimation { to: 1.0; duration: 400 }
+                                }
+                            }
+                        }
+
+                        // Classification badge
+                        Rectangle {
+                            width: classLabel.implicitWidth + 20
+                            height: 24
+                            radius: 12
+                            color: fng.value >= 0 ? Qt.rgba(
+                                fng.indexColor(fng.value).r,
+                                fng.indexColor(fng.value).g,
+                                fng.indexColor(fng.value).b, 0.15) : "#111827"
+                            border.color: fng.value >= 0 ? fng.indexColor(fng.value) : "#1e3a5f"
+                            border.width: 1
+                            visible: fng.classification !== ""
+
+                            Text {
+                                id: classLabel
+                                anchors.centerIn: parent
+                                text: fng.classification.toUpperCase()
+                                color: fng.value >= 0 ? fng.indexColor(fng.value) : "#64748b"
+                                font.pixelSize: 10
+                                font.bold: true
                                 font.letterSpacing: 1
                             }
-
-                            Text {
-                                text: modelData.value
-                                color: modelData.label === "STATUS"
-                                    ? (fngValue >= 0 ? "#22c55e" : (errorMsg !== "" ? "#ef4444" : "#64748b"))
-                                    : "#94a3b8"
-                                font.pixelSize: 12
-                                width: parent.width
-                                elide: Text.ElideRight
-                            }
                         }
-                    }
-                }
-            }
 
-            // ── ZONE BREAKDOWN CARD ───────────────────────────────────────────
-            Rectangle {
-                anchors { top: parent.top; left: indexCard.right; leftMargin: 16 + 280 + 16 }
-                width: 280
-                height: 260
-                color: "#0d1224"
-                border.color: "#1e3a5f"
-                border.width: 1
-                radius: 4
+                        Item { width: 1; height: 14 }
 
-                Rectangle {
-                    anchors { top: parent.top; left: parent.left; right: parent.right }
-                    height: 2
-                    color: "#7c3aed"
-                    radius: 2
-                }
-
-                Column {
-                    anchors { fill: parent; margins: 20 }
-                    spacing: 0
-
-                    Text {
-                        text: "ZONE BREAKDOWN"
-                        color: "#64748b"
-                        font.pixelSize: 10
-                        font.letterSpacing: 1.5
-                        bottomPadding: 16
-                    }
-
-                    Repeater {
-                        model: [
-                            { label: "EXTREME FEAR",  range: "0–24",  color: "#ef4444" },
-                            { label: "FEAR",          range: "25–44", color: "#f97316" },
-                            { label: "NEUTRAL",       range: "45–55", color: "#eab308" },
-                            { label: "GREED",         range: "56–75", color: "#84cc16" },
-                            { label: "EXTREME GREED", range: "76–100",color: "#22c55e" }
-                        ]
-
-                        delegate: Row {
+                        // Gauge bar
+                        Column {
                             width: parent.width
-                            height: 28
-                            spacing: 10
+                            spacing: 4
+                            visible: fng.value >= 0
 
                             Rectangle {
-                                width: 3; height: 22
-                                color: modelData.color
-                                radius: 1
-                                opacity: fngValue >= 0 && zoneActive(fngValue, modelData.range) ? 1.0 : 0.25
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
+                                width: parent.width
+                                height: 6
+                                radius: 3
+                                color: "#0f1929"
+                                border.color: "#1e2d50"
+                                border.width: 1
 
-                            Column {
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 1
-
-                                Text {
-                                    text: modelData.label
-                                    color: fngValue >= 0 && zoneActive(fngValue, modelData.range) ? modelData.color : "#334155"
-                                    font.pixelSize: 11
-                                    font.bold: fngValue >= 0 && zoneActive(fngValue, modelData.range)
-                                    font.letterSpacing: 0.5
+                                Rectangle {
+                                    width: parent.width * (fng.value / 100)
+                                    height: parent.height
+                                    radius: 3
+                                    color: fng.indexColor(fng.value)
+                                    Behavior on width { NumberAnimation { duration: 1000; easing.type: Easing.OutCubic } }
+                                    Behavior on color { ColorAnimation { duration: 800 } }
                                 }
                             }
 
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: modelData.range
-                                color: "#1e3a5f"
-                                font.pixelSize: 10
+                            Row {
+                                width: parent.width
+
+                                Text {
+                                    text: "0  FEAR"
+                                    color: "#ef4444"
+                                    font.pixelSize: 9
+                                    font.letterSpacing: 0.5
+                                    width: parent.width / 2
+                                }
+
+                                Text {
+                                    text: "GREED  100"
+                                    color: "#22c55e"
+                                    font.pixelSize: 9
+                                    font.letterSpacing: 0.5
+                                    width: parent.width / 2
+                                    horizontalAlignment: Text.AlignRight
+                                }
                             }
                         }
                     }
                 }
-            }
+
+                // ── METADATA CARD ────────────────────────────────────────────
+                Rectangle {
+                    width: isMobile ? parent.width : 280
+                    height: 260
+                    color: "#0d1224"
+                    border.color: "#1e3a5f"
+                    border.width: 1
+                    radius: 4
+
+                    Rectangle {
+                        anchors { top: parent.top; left: parent.left; right: parent.right }
+                        height: 2
+                        color: "#1e40af"
+                        radius: 2
+                    }
+
+                    Column {
+                        anchors { fill: parent; margins: 20 }
+                        spacing: 0
+
+                        Text {
+                            text: "SIGNAL METADATA"
+                            color: "#64748b"
+                            font.pixelSize: 10
+                            font.letterSpacing: 1.5
+                            bottomPadding: 20
+                        }
+
+                        Repeater {
+                            model: [
+                                { label: "SOURCE",     value: "alternative.me" },
+                                { label: "ENDPOINT",   value: "/fng/?limit=1" },
+                                { label: "UPDATED",    value: fng.timestamp !== "" ? fng.timestamp : "--" },
+                                { label: "RANGE",      value: "0 (Fear) – 100 (Greed)" },
+                                { label: "STATUS",     value: fng.fetching ? "FETCHING..." : (fng.value >= 0 ? "OK" : (fng.errorMsg !== "" ? "ERROR" : "--")) }
+                            ]
+
+                            delegate: Column {
+                                width: parent.width
+                                spacing: 2
+                                bottomPadding: 14
+
+                                Text {
+                                    text: modelData.label
+                                    color: "#334155"
+                                    font.pixelSize: 9
+                                    font.letterSpacing: 1
+                                }
+
+                                Text {
+                                    text: modelData.value
+                                    color: modelData.label === "STATUS"
+                                        ? (fng.value >= 0 ? "#22c55e" : (fng.errorMsg !== "" ? "#ef4444" : "#64748b"))
+                                        : "#94a3b8"
+                                    font.pixelSize: 12
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── ZONE BREAKDOWN CARD ──────────────────────────────────────
+                Rectangle {
+                    width: isMobile ? parent.width : 280
+                    height: 260
+                    color: "#0d1224"
+                    border.color: "#1e3a5f"
+                    border.width: 1
+                    radius: 4
+
+                    Rectangle {
+                        anchors { top: parent.top; left: parent.left; right: parent.right }
+                        height: 2
+                        color: "#7c3aed"
+                        radius: 2
+                    }
+
+                    Column {
+                        anchors { fill: parent; margins: 20 }
+                        spacing: 0
+
+                        Text {
+                            text: "ZONE BREAKDOWN"
+                            color: "#64748b"
+                            font.pixelSize: 10
+                            font.letterSpacing: 1.5
+                            bottomPadding: 16
+                        }
+
+                        Repeater {
+                            model: [
+                                { label: "EXTREME FEAR",  range: "0–24",   lo: 0,  hi: 24,  color: "#ef4444" },
+                                { label: "FEAR",          range: "25–44",  lo: 25, hi: 44,  color: "#f97316" },
+                                { label: "NEUTRAL",       range: "45–55",  lo: 45, hi: 55,  color: "#eab308" },
+                                { label: "GREED",         range: "56–75",  lo: 56, hi: 75,  color: "#84cc16" },
+                                { label: "EXTREME GREED", range: "76–100", lo: 76, hi: 100, color: "#22c55e" }
+                            ]
+
+                            delegate: Row {
+                                width: parent.width
+                                height: 28
+                                spacing: 10
+
+                                Rectangle {
+                                    width: 3; height: 22
+                                    color: modelData.color
+                                    radius: 1
+                                    opacity: fng.value >= 0 && fng.zoneActive(fng.value, modelData.lo, modelData.hi) ? 1.0 : 0.25
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+
+                                Column {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 1
+
+                                    Text {
+                                        text: modelData.label
+                                        color: fng.value >= 0 && fng.zoneActive(fng.value, modelData.lo, modelData.hi) ? modelData.color : "#334155"
+                                        font.pixelSize: 11
+                                        font.bold: fng.value >= 0 && fng.zoneActive(fng.value, modelData.lo, modelData.hi)
+                                        font.letterSpacing: 0.5
+                                    }
+                                }
+
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: modelData.range
+                                    color: "#1e3a5f"
+                                    font.pixelSize: 10
+                                }
+                            }
+                        }
+                    }
+                }
+            } // cardsFlow
 
             // ── BOTTOM ACTION BAR ─────────────────────────────────────────────
             Row {
-                anchors { top: indexCard.bottom; topMargin: 16; left: parent.left }
+                id: actionBar
+                anchors { top: cardsFlow.bottom; topMargin: 16; left: parent.left }
                 spacing: 12
 
                 Rectangle {
@@ -615,80 +618,58 @@ Window {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: fetchFng()
+                        onClicked: fng.fetch()
                     }
                 }
 
                 Text {
-                    text: errorMsg
+                    text: fng.errorMsg
                     color: "#ef4444"
                     font.pixelSize: 11
                     anchors.verticalCenter: parent.verticalCenter
-                    visible: errorMsg !== ""
+                    visible: fng.errorMsg !== ""
                 }
             }
         }
     }
 
-    Component.onCompleted: userField.forceActiveFocus()
+    Timer {
+        id: sessionTimer
+        interval: 1000
+        running: appState === "dashboard"
+        repeat: true
+        onTriggered: {
+            if (Date.now() >= SessionStore.expiresAt) logout()
+        }
+    }
+
+    Component.onCompleted: {
+        if (SessionStore.expiresAt > Date.now()) {
+            appState = "dashboard"
+            fng.fetch()
+        } else {
+            SessionStore.expiresAt = 0
+            userField.forceActiveFocus()
+        }
+    }
+
+    function logout() {
+        SessionStore.expiresAt = 0
+        appState = "login"
+        errorMsg = ""
+        userField.text = ""; passField.text = ""
+    }
 
     function doLogin() {
         errorMsg = ""
         if (userField.text === validUser && passField.text === validPass) {
+            SessionStore.expiresAt = Date.now() + sessionDurationMs
             appState = "dashboard"
-            fetchFng()
+            fng.fetch()
         } else {
             errorMsg = "Invalid credentials."
             passField.text = ""
             passField.forceActiveFocus()
         }
-    }
-
-    function fetchFng() {
-        fetching = true
-        errorMsg = ""
-        var xhr = new XMLHttpRequest()
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-                fetching = false
-                if (xhr.status === 200) {
-                    try {
-                        var json = JSON.parse(xhr.responseText)
-                        var entry = json.data[0]
-                        var parsed = parseInt(entry.value)
-                        if (isNaN(parsed)) {
-                            errorMsg = "Parse error: unexpected value format"
-                            return
-                        }
-                        fngValue = parsed
-                        fngClassification = entry.value_classification
-                        var d = new Date(parseInt(entry.timestamp) * 1000)
-                        fngTimestamp = d.toISOString().replace("T", " ")
-                    } catch (e) {
-                        errorMsg = "Parse error: unexpected response format"
-                    }
-                } else {
-                    errorMsg = "HTTP " + xhr.status + " - fetch failed"
-                }
-            }
-        }
-        xhr.open("GET", fngApiUrl)
-        xhr.send()
-    }
-
-    function indexColor(val) {
-        if (val <= 24) return "#ef4444"
-        if (val <= 44) return "#f97316"
-        if (val <= 55) return "#eab308"
-        if (val <= 75) return "#84cc16"
-        return "#22c55e"
-    }
-
-    function zoneActive(val, range) {
-        var parts = range.split("–")
-        if (parts.length !== 2) return false
-        var lo = parseInt(parts[0])
-        var hi = parseInt(parts[1])
-        return !isNaN(lo) && !isNaN(hi) && val >= lo && val <= hi
     }
 }

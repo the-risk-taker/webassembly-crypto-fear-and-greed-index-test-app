@@ -4,6 +4,9 @@
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
+    QCoreApplication::setOrganizationName("mateusz");
+    QCoreApplication::setOrganizationDomain("mateusz.dev");
+    QCoreApplication::setApplicationName("FAG");
 
     QQmlApplicationEngine engine;
     QObject::connect(
