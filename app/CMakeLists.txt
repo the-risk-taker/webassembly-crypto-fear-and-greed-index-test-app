@@ -14,6 +14,7 @@ qt_add_qml_module(appwebassembly
     URI webassembly
     QML_FILES
         Main.qml
+        HistoryChart.qml
 )
 
 set_target_properties(appwebassembly PROPERTIES

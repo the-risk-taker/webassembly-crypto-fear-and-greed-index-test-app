@@ -94,6 +94,32 @@ Window {
                 }
             }
 
+            Rectangle {
+                visible: appState === "dashboard"
+                width: 80; height: 22
+                radius: 2
+                color: refreshArea.pressed ? "#1d4ed8" : (refreshArea.containsMouse ? "#1e3a5f" : "transparent")
+                border.color: "#3b82f6"
+                border.width: 1
+                anchors.verticalCenter: parent.verticalCenter
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "↻ REFRESH"
+                    color: "#3b82f6"
+                    font.pixelSize: 10
+                    font.letterSpacing: 1
+                }
+
+                MouseArea {
+                    id: refreshArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: fng.fetch()
+                }
+            }
+
             // Logout button
             Rectangle {
                 visible: appState === "dashboard"
@@ -286,21 +312,109 @@ Window {
 
         // Main content
         Flickable {
+            id: dashboardView
             anchors { fill: parent; margins: isMobile ? 16 : 24 }
             contentWidth: width
-            contentHeight: cardsFlow.height + 16 + actionBar.height
+            contentHeight: cardsFlow.height
             clip: true
             boundsBehavior: Flickable.StopAtBounds
 
             Flow {
                 id: cardsFlow
                 width: parent.width
+                readonly property real cardWidth: isMobile ? width : (width - 3 * spacing) / 4
                 spacing: 16
+
+                // ── BTC PRICE CARD ───────────────────────────────────────────
+                Rectangle {
+                    id: btcCard
+                    width: cardsFlow.cardWidth
+                    height: 260
+                    color: "#0d1224"
+                    border.color: "#1e3a5f"
+                    border.width: 1
+                    radius: 4
+
+                    readonly property var prices: fng.btcPrices
+                    readonly property bool hasPrice: prices.length > 0
+
+                    function usd(v) { return "$" + Number(v).toLocaleString(Qt.locale("en_US"), "f", 0) }
+
+                    Rectangle {
+                        anchors { top: parent.top; left: parent.left; right: parent.right }
+                        height: 2
+                        color: "#f59e0b"
+                        radius: 2
+                    }
+
+                    Column {
+                        anchors { fill: parent; margins: 20 }
+                        spacing: 0
+
+                        Text {
+                            text: "BTC / USD"
+                            color: "#64748b"
+                            font.pixelSize: 10
+                            font.letterSpacing: 1.5
+                            bottomPadding: 24
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: btcCard.hasPrice ? btcCard.usd(btcCard.prices[0]) : "--"
+                            color: btcCard.hasPrice ? "#f59e0b" : "#1e3a5f"
+                            font.pixelSize: 40
+                            font.bold: true
+                            fontSizeMode: Text.HorizontalFit
+                            minimumPixelSize: 20
+                            bottomPadding: 24
+                        }
+
+                        Repeater {
+                            model: [
+                                { label: "1D AGO", index: 1 },
+                                { label: "3D AGO", index: 2 },
+                                { label: "7D AGO", index: 3 }
+                            ]
+
+                            delegate: Item {
+                                id: priceRow
+                                width: parent.width
+                                height: 26
+
+                                readonly property real past: btcCard.hasPrice ? btcCard.prices[modelData.index] : 0
+                                readonly property real change: past > 0 ? (btcCard.prices[0] - past) / past * 100 : 0
+
+                                Text {
+                                    anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+                                    text: modelData.label
+                                    color: "#475569"
+                                    font.pixelSize: 10
+                                    font.letterSpacing: 1
+                                }
+
+                                Text {
+                                    anchors { horizontalCenter: parent.horizontalCenter; verticalCenter: parent.verticalCenter }
+                                    text: priceRow.past > 0 ? btcCard.usd(priceRow.past) : "--"
+                                    color: "#94a3b8"
+                                    font.pixelSize: 12
+                                }
+
+                                Text {
+                                    anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+                                    text: priceRow.past > 0 ? (priceRow.change >= 0 ? "+" : "") + priceRow.change.toFixed(2) + "%" : ""
+                                    color: priceRow.change >= 0 ? "#22c55e" : "#ef4444"
+                                    font.pixelSize: 11
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // ── INDEX CARD ───────────────────────────────────────────────
                 Rectangle {
                     id: indexCard
-                    width: isMobile ? parent.width : 320
+                    width: cardsFlow.cardWidth
                     height: 260
                     color: "#0d1224"
                     border.color: "#1e3a5f"
@@ -423,7 +537,7 @@ Window {
                                 Text {
                                     text: "0  FEAR"
                                     color: "#ef4444"
-                                    font.pixelSize: 9
+                                    font.pixelSize: 10
                                     font.letterSpacing: 0.5
                                     width: parent.width / 2
                                 }
@@ -431,7 +545,7 @@ Window {
                                 Text {
                                     text: "GREED  100"
                                     color: "#22c55e"
-                                    font.pixelSize: 9
+                                    font.pixelSize: 10
                                     font.letterSpacing: 0.5
                                     width: parent.width / 2
                                     horizontalAlignment: Text.AlignRight
@@ -443,7 +557,7 @@ Window {
 
                 // ── METADATA CARD ────────────────────────────────────────────
                 Rectangle {
-                    width: isMobile ? parent.width : 280
+                    width: cardsFlow.cardWidth
                     height: 260
                     color: "#0d1224"
                     border.color: "#1e3a5f"
@@ -485,8 +599,8 @@ Window {
 
                                 Text {
                                     text: modelData.label
-                                    color: "#334155"
-                                    font.pixelSize: 9
+                                    color: "#475569"
+                                    font.pixelSize: 10
                                     font.letterSpacing: 1
                                 }
 
@@ -506,7 +620,7 @@ Window {
 
                 // ── ZONE BREAKDOWN CARD ──────────────────────────────────────
                 Rectangle {
-                    width: isMobile ? parent.width : 280
+                    width: cardsFlow.cardWidth
                     height: 260
                     color: "#0d1224"
                     border.color: "#1e3a5f"
@@ -570,66 +684,29 @@ Window {
                                 Text {
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: modelData.range
-                                    color: "#1e3a5f"
+                                    color: "#475569"
                                     font.pixelSize: 10
                                 }
                             }
                         }
                     }
                 }
-            } // cardsFlow
-
-            // ── BOTTOM ACTION BAR ─────────────────────────────────────────────
-            Row {
-                id: actionBar
-                anchors { top: cardsFlow.bottom; topMargin: 16; left: parent.left }
-                spacing: 12
-
-                Rectangle {
-                    width: 120; height: 34
-                    radius: 2
-                    color: refreshArea.pressed ? "#1d4ed8" : (refreshArea.containsMouse ? "#1e3a5f" : "transparent")
-                    border.color: "#3b82f6"
-                    border.width: 1
-
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: 6
-
-                        Text {
-                            text: "↻"
-                            color: "#3b82f6"
-                            font.pixelSize: 14
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-
-                        Text {
-                            text: "REFRESH"
-                            color: "#3b82f6"
-                            font.pixelSize: 11
-                            font.bold: true
-                            font.letterSpacing: 1
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                    }
-
-                    MouseArea {
-                        id: refreshArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: fng.fetch()
-                    }
+                HistoryChart {
+                    width: parent.width
+                    height: isMobile ? 300 : Math.max(360, dashboardView.height - 260 - cardsFlow.spacing)
+                    history: fng.history
                 }
 
                 Text {
+                    width: parent.width
                     text: fng.errorMsg
                     color: "#ef4444"
                     font.pixelSize: 11
-                    anchors.verticalCenter: parent.verticalCenter
+                    wrapMode: Text.Wrap
                     visible: fng.errorMsg !== ""
                 }
-            }
+            } // cardsFlow
+
         }
     }
 
@@ -649,7 +726,9 @@ Window {
             fng.fetch()
         } else {
             SessionStore.expiresAt = 0
-            userField.forceActiveFocus()
+            // On mobile an auto-focused field pops up the keyboard on the first tap anywhere
+            if (!isMobile)
+                userField.forceActiveFocus()
         }
     }
 
@@ -665,6 +744,9 @@ Window {
         if (userField.text === validUser && passField.text === validPass) {
             SessionStore.expiresAt = Date.now() + sessionDurationMs
             appState = "dashboard"
+            // Move focus off the hidden text fields so the mobile keyboard closes and stays closed
+            userField.focus = false
+            passField.focus = false
             fng.fetch()
         } else {
             errorMsg = "Invalid credentials."

@@ -113,6 +113,33 @@ SPDX-License-Identifier: LicenseRef-Qt-Commercial OR GPL-3.0-only
     <div id="screen"></div>
 
     <script type="text/javascript">
+        // Workaround: Qt focuses a contenteditable "focus helper" div on every tap, which pops up
+        // the keyboard on mobile browsers. Real text fields use a separate <input>, so they still work.
+        function disableTouchFocusKeyboard(screen) {
+            if (!window.matchMedia('(pointer: coarse)').matches)
+                return;
+            // Qt may create its shadow root after onLoaded, so watch the screen until it shows up
+            const fix = root => root.querySelectorAll('.qt-window-focus-helper[contenteditable="true"]').forEach(el => {
+                el.setAttribute('contenteditable', 'false');
+                el.tabIndex = -1;
+            });
+            const watchRoot = root => {
+                fix(root);
+                new MutationObserver(() => fix(root)).observe(root, { childList: true, subtree: true, attributes: true });
+            };
+            const root = screen.firstElementChild?.shadowRoot;
+            if (root)
+                return watchRoot(root);
+            const screenObserver = new MutationObserver(() => {
+                const root = screen.firstElementChild?.shadowRoot;
+                if (!root)
+                    return;
+                screenObserver.disconnect();
+                watchRoot(root);
+            });
+            screenObserver.observe(screen, { childList: true, subtree: true });
+        }
+
         async function init() {
             const spinner = document.querySelector('#qtspinner');
             const screen  = document.querySelector('#screen');
@@ -127,7 +154,10 @@ SPDX-License-Identifier: LicenseRef-Qt-Commercial OR GPL-3.0-only
 
                 const instance = await qtLoad({
                     qt: {
-                        onLoaded: () => hideSpinner(),
+                        onLoaded: () => {
+                            hideSpinner();
+                            disableTouchFocusKeyboard(screen);
+                        },
                         onExit: exitData => {
                             status.innerHTML = 'APPLICATION EXIT';
                             if (exitData.code !== undefined)

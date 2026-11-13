@@ -78,7 +78,10 @@ Multithreaded WASM requires `Cross-Origin-Opener-Policy` and `Cross-Origin-Embed
 /*
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
+  Cache-Control: no-cache
 ```
+
+`Cache-Control: no-cache` makes browsers revalidate by ETag on every load, so `appwebassembly.js` and `appwebassembly.wasm` always come from the same build.
 
 Deploy the built sources with wrangler:
 
@@ -93,3 +96,4 @@ First run creates the Pages project and prints a `*.pages.dev` URL - verify it l
 1. Add the domain as a zone in the Cloudflare dashboard (skip if already there) and point its nameservers at Cloudflare.
 2. Dashboard -> Workers & Pages -> the project -> **Custom domains** -> add the desired subdomain (e.g. `app.example.com`). Cloudflare creates the CNAME and issues the certificate automatically.
 3. Verify: `curl -I https://<subdomain>` and confirm `cross-origin-opener-policy` / `cross-origin-embedder-policy` headers are present.
+4. Zone dashboard -> Caching -> Configuration -> **Browser Cache TTL** -> set to **Respect Existing Headers**. Otherwise the zone overrides `Cache-Control: no-cache` from `_headers` on `.js` files (e.g. `max-age=14400`), browsers keep a stale `appwebassembly.js` next to a fresh `appwebassembly.wasm` after a deploy and the app crashes with `TypeError: ASM_CONSTS[code] is not a function`.
